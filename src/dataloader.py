@@ -1,8 +1,11 @@
 from collections import defaultdict
 import os
+import random
 import torchaudio
 import torch
 import torch.nn.functional as F
+import pyworld as pw
+import numpy as np
 
 # Audio dataset that loads waveform tensors from a given path
 # The directory structure is as follows:
@@ -41,6 +44,15 @@ class AudioDataset(torch.utils.data.Dataset):
             file_path = os.path.join(speaker_path, file)
             if os.path.isfile(file_path):
               self.speaker_file_dict[speaker].append(file_path)
+      
+      # Shuffle the files to make the dataset parallel-data-free
+      for files in self.speaker_file_dict.values():
+        random.shuffle(files)
+    
+    def extract_features(self, waveform):
+      f0, sp, ap = pw.wav2world(waveform.numpy().squeeze(0).astype(np.double), self.sr, frame_period=5.0)
+      import pdb; pdb.set_trace()
+      return ap
     
     def __len__(self):
       return len(self.speaker_file_dict['SF1']) // self.batch_size
@@ -49,13 +61,11 @@ class AudioDataset(torch.utils.data.Dataset):
       source = self.speaker_file_dict['SF1'][idx]
       target = self.speaker_file_dict['TF2'][idx]
 
+      import pdb; pdb.set_trace()
       source_wav, sample_rate = torchaudio.load(source)
       source_wav = torchaudio.transforms.Resample(sample_rate, self.sr)(source_wav)
 
       target_wav, sample_rate = torchaudio.load(target)
       target_wav = torchaudio.transforms.Resample(sample_rate, self.sr)(target_wav)
 
-      pad_len = max(source_wav.shape[1], target_wav.shape[1])
-      source_wav = F.pad(source_wav, (0, pad_len - source_wav.shape[1]))
-      target_wav = F.pad(target_wav, (0, pad_len - target_wav.shape[1]))
-      return torch.cat([source_wav, target_wav])
+      return (self.extract_features(source_wav), self.extract_features(target_wav))
