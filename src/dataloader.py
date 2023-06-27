@@ -1,11 +1,11 @@
-from collections import defaultdict
 import os
+
 import random
-import torchaudio
 import torch
-import torch.nn.functional as F
 import pyworld as pw
 import numpy as np
+import librosa
+from collections import defaultdict
 
 # Audio dataset that loads waveform tensors from a given path
 # The directory structure is as follows:
@@ -35,7 +35,6 @@ class AudioDataset(torch.utils.data.Dataset):
 
     def load_files(self):
       # offset into self.files
-      offset = 0
       for speaker in os.listdir(self.path):
         speaker_path = os.path.join(self.path, speaker)
         self.speaker_ids.append(speaker)
@@ -49,10 +48,19 @@ class AudioDataset(torch.utils.data.Dataset):
       for files in self.speaker_file_dict.values():
         random.shuffle(files)
     
-    def extract_features(self, waveform):
-      f0, sp, ap = pw.wav2world(waveform.numpy().squeeze(0).astype(np.double), self.sr, frame_period=5.0)
-      import pdb; pdb.set_trace()
-      return ap
+    def extract_features(self, file_path):
+      waveform, _ = librosa.load(file_path, sr=self.sr, mono=True)
+
+      wav = waveform.astype(np.float64)
+      f0, time_axis = pw.harvest(wav, self.sr, frame_period=5.0, f0_floor=71.0, f0_ceil=800.0)
+
+      sp = pw.cheaptrick(wav, f0, time_axis, self.sr)
+
+      ap = pw.d4c(wav, f0, time_axis, self.sr)
+
+      mcep = pw.code_spectral_envelope(sp, self.sr, 24)
+      
+      return f0, time_axis, sp, ap, mcep
     
     def __len__(self):
       return len(self.speaker_file_dict['SF1']) // self.batch_size
@@ -61,11 +69,4 @@ class AudioDataset(torch.utils.data.Dataset):
       source = self.speaker_file_dict['SF1'][idx]
       target = self.speaker_file_dict['TF2'][idx]
 
-      import pdb; pdb.set_trace()
-      source_wav, sample_rate = torchaudio.load(source)
-      source_wav = torchaudio.transforms.Resample(sample_rate, self.sr)(source_wav)
-
-      target_wav, sample_rate = torchaudio.load(target)
-      target_wav = torchaudio.transforms.Resample(sample_rate, self.sr)(target_wav)
-
-      return (self.extract_features(source_wav), self.extract_features(target_wav))
+      return (self.extract_features(source), self.extract_features(target))

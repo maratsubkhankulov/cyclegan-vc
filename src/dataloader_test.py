@@ -12,11 +12,10 @@ class AudioDatasetTest(unittest.TestCase):
     print(waveform.size())
   
   def test_audio_dataset(self):
-    dataset = AudioDataset('data/vcc2016_training', batch_size=1, sr=22050)
+    dataset = AudioDataset('data/vcc2016_training', batch_size=1, sr=16000)
     train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=1)
     iterator = iter(train_dataloader)
     count_samples = 0
     for batch in iterator:
       count_samples += 1
-    # assert that count_samples == len(dataset)
     self.assertEqual(count_samples, len(dataset))
