@@ -23,10 +23,11 @@ from collections import defaultdict
 # pair. 
 class AudioDataset(torch.utils.data.Dataset):
     
-    def __init__(self, path, batch_size=1, sr=16_000):
+    def __init__(self, path, batch_size=1, sr=16_000, n_frames=128):
       self.path = path
       self.batch_size = batch_size
       self.sr = sr
+      self.n_frames = n_frames
       self.speaker_ids = [] # speaker 
       self.speaker_file_dict = defaultdict(list) # speaker name to list of file paths
       self.sources = ['SF1', 'SF2']
@@ -49,9 +50,12 @@ class AudioDataset(torch.utils.data.Dataset):
         random.shuffle(files)
     
     def extract_features(self, file_path):
-      waveform, _ = librosa.load(file_path, sr=self.sr, mono=True)
+      wav, _ = librosa.load(file_path, sr=self.sr, mono=True)
+      wav = wav.astype(np.float64)
 
-      wav = waveform.astype(np.float64)
+      # Adjust length of waveform to produce n_frames mel-cepstral coefficients
+      wav = wav[:self.n_frames * (self.sr // 1000 * 5) - 1]
+
       f0, time_axis = pw.harvest(wav, self.sr, frame_period=5.0, f0_floor=71.0, f0_ceil=800.0)
 
       sp = pw.cheaptrick(wav, f0, time_axis, self.sr)
@@ -69,4 +73,7 @@ class AudioDataset(torch.utils.data.Dataset):
       source = self.speaker_file_dict['SF1'][idx]
       target = self.speaker_file_dict['TF2'][idx]
 
-      return (self.extract_features(source), self.extract_features(target))
+      source_features = self.extract_features(source)
+      target_features = self.extract_features(target)
+
+      return (source_features, target_features)
