@@ -19,15 +19,18 @@ This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
     - Looks similar to how loss sample distributions are defined in the paper
     - Can proceed with my code, then debug and update understanding
 - [x] Load data and extract features using WORLD vocoder
-- [] Run training over supplied features
-- [] If loss doesn't improve, debug
-
-
-TODOS:
 - [x] Load all necessary data in AudioDataset
   - corresponds to 12 mins cited from the paper
 - [x] Test out feature extraction code here: https://github.com/pritishyuvraj/Voice-Conversion-GAN/blob/master/preprocess.py
 - [x] How to obtain MCEPs?
 - [?] The input to generator has 23 channels - does this correspond to the 24 MCEPs per time step?
-- []  - How to pack the other data into the input?
+- [x]  - How to pack the other data into the input?
   - You don't - the generators map from MCEP to MCEP
+- [x] Change generator architecture to use 1d convolution
+  - [x] Fix dataset implementation to produce [B, T, D] tensors
+- [] Change loss function to use source and target
+- [] Run training over supplied features
+- [] If loss doesn't improve, debug
+
+
+TODOS:
