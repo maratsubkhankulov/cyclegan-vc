@@ -28,8 +28,16 @@ This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
   - You don't - the generators map from MCEP to MCEP
 - [x] Change generator architecture to use 1d convolution
   - [x] Fix dataset implementation to produce [B, T, D] tensors
-- [] Change loss function to use source and target
-- [] Run training over supplied features
+- [x] Change loss function to use source and target
+- [x] Run training over supplied features
+- [x] Vocode a full-length audio sample
+- [x] Pad features
+  - if train=True, WorldDataset should return truncated segments
+  - else: WorldDataset should return full segments that can be synthesized into waveforms
+  - [x] there should be a test
+- [x] Adjust loss coefficients to those used in the paper
+- [] Add test/validation dataset and graph how that varies with training loss
+- [] Add learning rate modulation after n epochs
 - [] If loss doesn't improve, debug
 
 

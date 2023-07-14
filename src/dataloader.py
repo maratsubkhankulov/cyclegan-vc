@@ -63,13 +63,16 @@ class WorldDataset(torch.utils.data.Dataset):
     ap = pw.d4c(wav, f0, time_axis, self.sr)
     mcep = pw.code_spectral_envelope(sp, self.sr, 24)
     
+    if self.train:
+      mcep = self.sample_mcep_segment(mcep, self.n_frames)
+    
     return f0, time_axis, sp, ap, mcep
   
   def sample_mcep_segment(self, mcep, n_frames):
     """
     Randomly sample a 128 frame segment
     """
-    start = random.randint(0, mcep - n_frames)
+    start = random.randint(0, mcep.shape[0] - n_frames)
     end = start + self.n_frames
     return mcep[start:end]
   
@@ -82,9 +85,5 @@ class WorldDataset(torch.utils.data.Dataset):
 
     source_features = self.extract_features(source)
     target_features = self.extract_features(target)
-
-    if self.train:
-      source_features[-1] = self.sample_mcep_segment(source_features[-1], self.n_frames)
-      target_features[-1] = self.sample_mcep_segment(target_features[-1], self.n_frames)
 
     return (source_features, target_features)
