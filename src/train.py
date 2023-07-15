@@ -1,5 +1,7 @@
 import torch
 
+from dataloader import WorldDataset
+from torch.utils.data import DataLoader
 from model import CycleGAN
 
 def train_cyclegan():
@@ -82,31 +84,36 @@ def train_cyclegan():
   source_features = torch.randn(1, 24, 128).to(device)
   target_features = torch.randn(1, 24, 128).to(device)
 
-  def train(num_epochs):
-    epochs = []
-    losses = []
+  dataset = WorldDataset('./data/vcc2016_training', batch_size=1, sr=16000)
+  train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=1)
 
-    for epoch in range(num_epochs):
-      if epoch % 10 == 0:
-        print(f'Epoch {epoch}')
-      loss = training_iteration(
-        source_features,
-        target_features,
-        optimizer,
-        criterion,
-        cycleGAN.Gx_y,
-        cycleGAN.Gy_x,
-        cycleGAN.Dx,
-        cycleGAN.Dy,
-      )
-      epochs.append(epoch)
-      losses.append(loss.item())
+  def train(epochs):
+    for i in range(epochs):
+      print(f'Epoch {i}')
+      iteration = 0
+      for batch in train_dataloader:
+        print(f'iteration {iteration}')
+        
+        # convert to float32 because model is defined this way
+        source_features = batch[0][-1].to(dtype=torch.float32).transpose(1, 2)
+        target_features = batch[1][-1].to(dtype=torch.float32).transpose(1, 2)
 
-    import matplotlib.pyplot as plt
-    plt.plot(epochs, losses)
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('dx_loss')
-    plt.show()
+        loss = training_iteration(
+                            x=source_features,
+                            y=target_features,
+                            real_labels=real_labels,
+                            fake_labels=fake_labels,
+                            optimizer=optimizer,
+                            criterion=criterion,
+                            Gx_y=cycleGAN.Gx_y,
+                            Gy_x=cycleGAN.Gy_x,
+                            Dx=cycleGAN.Dx,
+                            Dy=cycleGAN.Dy)
 
-  train(num_epochs = 3)
+        print(f'loss: {loss.item()}')
+        iteration += 1
+
+  train(epochs = 3)
+
+if __name__ == '__main__':
+  train_cyclegan()
