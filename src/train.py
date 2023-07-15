@@ -1,8 +1,31 @@
 import torch
+import os
+import glob
 
 from dataloader import WorldDataset
 from torch.utils.data import DataLoader
 from model import CycleGAN
+from datetime import datetime
+
+def save_ckpt(cycleGAN):
+  current_time = datetime.now()
+  timestamp = current_time.strftime('%b%d_%H-%M-%S')
+  path = "./checkpoints/" + timestamp + ".pt"
+
+  # Save state dict of cycleGAN
+  torch.save(cycleGAN.state_dict(), path)
+
+def load_ckpt():
+  files = glob.glob(os.path.join('./checkpoints/', '*.pt'))
+  
+  files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+  latest_ckpt = files[0]
+  cycleGAN_loaded = CycleGAN()
+  cycleGAN_loaded.load_state_dict(torch.load(latest_ckpt))
+  cycleGAN_loaded.eval()
+
+  return cycleGAN_loaded
+
 
 def train_cyclegan():
   # Loss parameters
@@ -72,7 +95,7 @@ def train_cyclegan():
   device = 'cpu'
 
   batch_size=1
-  cycleGAN = CycleGAN()
+  cycleGAN = load_ckpt()
   cycleGAN.to(device)
 
   # Create labels which are later used as input for the BCU loss
@@ -112,6 +135,7 @@ def train_cyclegan():
 
         print(f'loss: {loss.item()}')
         iteration += 1
+      save_ckpt(cycleGAN)
 
   train(epochs = 3)
 
