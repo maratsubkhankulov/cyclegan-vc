@@ -1,3 +1,4 @@
+import time
 import torch
 import os
 import glob
@@ -92,25 +93,26 @@ def train_cyclegan():
     # Return all losses
     return full_loss
 
-  device = 'cpu'
+  device = 'cuda:0'
 
   batch_size=1
   cycleGAN = load_ckpt()
-  cycleGAN.to(device)
+  cycleGAN = cycleGAN.to(device)
 
   # Create labels which are later used as input for the BCU loss
-  real_labels = torch.ones(batch_size, 1)
-  fake_labels = torch.zeros(batch_size, 1)
+  real_labels = torch.ones(batch_size, 1, device=device)
+  fake_labels = torch.zeros(batch_size, 1, device=device)
 
   optimizer=torch.optim.Adam(cycleGAN.parameters(), lr=0.0002)
   criterion=torch.nn.BCELoss()
-  source_features = torch.randn(1, 24, 128).to(device)
-  target_features = torch.randn(1, 24, 128).to(device)
 
   dataset = WorldDataset('./data/vcc2016_training', batch_size=1, sr=16000)
   train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=1)
 
+  checkpoint_every = 500
+  stat_every = 100
   def train(epochs):
+    start = time.time()
     for i in range(epochs):
       print(f'Epoch {i}')
       iteration = 0
@@ -120,6 +122,8 @@ def train_cyclegan():
         # convert to float32 because model is defined this way
         source_features = batch[0][-1].to(dtype=torch.float32).transpose(1, 2)
         target_features = batch[1][-1].to(dtype=torch.float32).transpose(1, 2)
+        source_features = source_features.to(device)
+        target_features = target_features.to(device)
 
         loss = training_iteration(
                             x=source_features,
@@ -133,11 +137,17 @@ def train_cyclegan():
                             Dx=cycleGAN.Dx,
                             Dy=cycleGAN.Dy)
 
-        print(f'loss: {loss.item()}')
         iteration += 1
-      save_ckpt(cycleGAN)
+        if iteration % stat_every == 0:
+          print(f'loss: {loss.item()}')
 
-  train(epochs = 3)
+          elapsed = time.time() - start
+          start = time.time()
+          print(f'Iterations per second: {stat_every / elapsed}')
+        if iteration % checkpoint_every == 0:
+          save_ckpt(cycleGAN)
+
+  train(epochs = 100)
 
 if __name__ == '__main__':
   train_cyclegan()

@@ -38,6 +38,8 @@ This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
 - [x] Adjust loss coefficients to those used in the paper
 - [x] Extract model from notebook and add a test
 - [x] Extract train.py from notebook
+- [x] Add checkpointing
+- [] Enable GPU training
 - [] Add test/validation dataset and graph how that varies with training loss
 - [] Add learning rate modulation after n epochs
 - [] If loss doesn't improve, debug

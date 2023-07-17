@@ -27,16 +27,18 @@ class WorldDataset(torch.utils.data.Dataset):
   using World vocoder.
   """
     
-  def __init__(self, path, batch_size=1, sr=16_000, train=True):
+  def __init__(self, path, batch_size=1, sr=16_000, train=True, device='cpu:0'):
     self.path = path
     self.batch_size = batch_size
     self.sr = sr
     self.train = train
+    self.device = device
     self.n_frames = 128
     self.speaker_ids = [] # speaker 
     self.speaker_file_dict = defaultdict(list) # speaker name to list of file paths
-    self.sources = ['SF1', 'SF2']
-    self.targets = ['TF2', 'TM2']
+    self.sources = ['SF1'] #, 'SF2']
+    self.targets = ['TF2'] #, 'TM2']
+    self.feature_cache = {}
     self.load_files()
 
   def load_files(self):
@@ -53,6 +55,13 @@ class WorldDataset(torch.utils.data.Dataset):
     # Shuffle the files to make the dataset parallel-data-free
     for files in self.speaker_file_dict.values():
       random.shuffle(files)
+
+    # Cache files in memory
+    print("Loading features")
+    for speaker_id in self.sources + self.targets: 
+      for file_path in self.speaker_file_dict[speaker_id]:
+        print("Loading", file_path)
+        self.feature_cache[file_path] = self.extract_features(file_path)
   
   def extract_features(self, file_path):
     wav, _ = librosa.load(file_path, sr=self.sr, mono=True)
@@ -66,6 +75,11 @@ class WorldDataset(torch.utils.data.Dataset):
     if self.train:
       mcep = self.sample_mcep_segment(mcep, self.n_frames)
     
+    f0 = torch.tensor(f0, device=self.device)
+    time_axis = torch.tensor(time_axis, device=self.device)
+    sp = torch.tensor(sp, device=self.device)
+    ap = torch.tensor(ap, device=self.device)
+    mcep = torch.tensor(mcep, device=self.device)
     return f0, time_axis, sp, ap, mcep
   
   def sample_mcep_segment(self, mcep, n_frames):
@@ -83,7 +97,7 @@ class WorldDataset(torch.utils.data.Dataset):
     source = self.speaker_file_dict['SF1'][idx]
     target = self.speaker_file_dict['TF2'][idx]
 
-    source_features = self.extract_features(source)
-    target_features = self.extract_features(target)
+    source_features = self.feature_cache[source]
+    target_features = self.feature_cache[target]
 
     return (source_features, target_features)
