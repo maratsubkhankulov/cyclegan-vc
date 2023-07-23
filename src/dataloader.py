@@ -35,7 +35,7 @@ class WorldDataset(torch.utils.data.Dataset):
     self.device = device
     self.n_frames = 128
     self.speaker_ids = [] # speaker 
-    self.speaker_file_dict = defaultdict(list) # speaker name to list of file paths
+    self.speaker_file_dict = defaultdict(list) # speaker -> [file1, file2, ...]
     self.sources = ['SF1'] #, 'SF2']
     self.targets = ['TF2'] #, 'TM2']
     self.feature_cache = {}
@@ -52,16 +52,9 @@ class WorldDataset(torch.utils.data.Dataset):
           if os.path.isfile(file_path):
             self.speaker_file_dict[speaker].append(file_path)
     
-    # Shuffle the files to make the dataset parallel-data-free
-    for files in self.speaker_file_dict.values():
-      random.shuffle(files)
-
-    # Cache files in memory
-    print("Loading features")
-    for speaker_id in self.sources + self.targets: 
-      for file_path in self.speaker_file_dict[speaker_id]:
-        print("Loading", file_path)
-        self.feature_cache[file_path] = self.extract_features(file_path)
+    if self.train:
+      for files in self.speaker_file_dict.values():
+        random.shuffle(files)
   
   def extract_features(self, file_path):
     wav, _ = librosa.load(file_path, sr=self.sr, mono=True)
@@ -74,14 +67,27 @@ class WorldDataset(torch.utils.data.Dataset):
     
     if self.train:
       mcep = self.sample_mcep_segment(mcep, self.n_frames)
+
+    # Example name = {example_id}_{speaker_id}
+    speaker_id = file_path.split('/')[-2]
+    example_id = file_path.split('/')[-1].replace('.wav', '')
+    example_name = example_id + '_' + speaker_id
     
     f0 = torch.tensor(f0, device=self.device)
     time_axis = torch.tensor(time_axis, device=self.device)
     sp = torch.tensor(sp, device=self.device)
     ap = torch.tensor(ap, device=self.device)
     mcep = torch.tensor(mcep, device=self.device)
-    return f0, time_axis, sp, ap, mcep
-  
+    return f0, time_axis, sp, ap, example_name, wav, mcep
+
+  def extract_features_memoized(self, file_path):
+    if file_path in self.feature_cache:
+      return self.feature_cache[file_path]
+    else:
+      features = self.extract_features(file_path)
+      self.feature_cache[file_path] = features
+      return features 
+
   def sample_mcep_segment(self, mcep, n_frames):
     """
     Randomly sample a 128 frame segment
@@ -97,7 +103,7 @@ class WorldDataset(torch.utils.data.Dataset):
     source = self.speaker_file_dict['SF1'][idx]
     target = self.speaker_file_dict['TF2'][idx]
 
-    source_features = self.feature_cache[source]
-    target_features = self.feature_cache[target]
+    source_features = self.extract_features_memoized(source)
+    target_features = self.extract_features_memoized(target)
 
     return (source_features, target_features)

@@ -1,12 +1,17 @@
 import time
 import torch
+import numpy as np
 import os
 import glob
+import pyworld as pw
+import soundfile as sf
 
 from dataloader import WorldDataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from model import CycleGAN
 from datetime import datetime
+
+eval_dir = './eval'
 
 def save_ckpt(cycleGAN):
   current_time = datetime.now()
@@ -27,6 +32,53 @@ def load_ckpt():
 
   return cycleGAN_loaded
 
+def synthesize_mcep(f0, sp, ap, mcep, fs, frame_period):
+  sp = pw.decode_spectral_envelope(mcep.numpy(), fs, fft_size=1024)
+  y = pw.synthesize(f0, sp, ap, fs, frame_period)
+  return y
+
+def log_output_for_eval(source_features, target_features, xy_mcep, yx_mcep, path):
+  """ Saves wavefiles for evaluation:
+      - source waveform (x)
+      - target waveform (y)
+      - synthesized waveform for Gx_y(source_features.mcep)
+      - synthesized waveform for Gy_x(target_features.mcep)
+      """
+
+  fs = 16000
+  frame_period = 5.0
+
+  # Save source and target waveforms
+  source_wav = source_features[5][0].numpy()
+  target_wav = target_features[5][0].numpy()
+
+  source_name = source_features[4][0]
+  target_name = target_features[4][0]
+
+  sf.write(path + '/' + source_name + '_source.wav', source_wav, fs)
+  sf.write(path + '/' + target_name + '_target.wav', target_wav, fs)
+  
+  # Save Gx_y output
+  def synthesize_and_save(features, name, path, mcep):
+    f0 = features[0][0].numpy()
+    sp = features[2][0].numpy()
+    ap = features[3][0].numpy()
+
+    mcep = mcep[-1].squeeze(0).transpose(-2, -1).to(dtype=torch.float64).contiguous().detach()
+    mcep = mcep.cpu()
+
+    # pad mcep to min number of frames of f0
+    if mcep.shape[0] < f0.shape[0]:
+      mcep = torch.cat((mcep, torch.zeros((f0.shape[0] - mcep.shape[0], mcep.shape[1]))), dim=0)
+    # else clip mcep to match f0
+    else:
+      mcep = mcep[:f0.shape[0], :]
+
+    wav = synthesize_mcep(f0, sp, ap, mcep, fs, frame_period)
+    sf.write(path + '/' + name + '_fake.wav', wav, fs)
+  
+  synthesize_and_save(source_features, target_name, path, xy_mcep)
+  synthesize_and_save(target_features, source_name, path, yx_mcep)
 
 def train_cyclegan():
   # Loss parameters
@@ -106,28 +158,39 @@ def train_cyclegan():
   optimizer=torch.optim.Adam(cycleGAN.parameters(), lr=0.0002)
   criterion=torch.nn.BCELoss()
 
-  dataset = WorldDataset('./data/vcc2016_training', batch_size=1, sr=16000)
-  train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=1)
+  
+  eval_dataset = WorldDataset('./data/vcc2016_training', batch_size=1, train=False, sr=16000)
+  eval_dataloader = DataLoader(eval_dataset, batch_size=1, shuffle=False, num_workers=1)
+
+  dataset = WorldDataset('./data/vcc2016_training', batch_size=1, train=True, sr=16000)
+  train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
+  
+  train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=1)
+  test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_workers=1)
 
   checkpoint_every = 500
   stat_every = 100
+  log_every = 162
+
   def train(epochs):
     start = time.time()
+    iteration = 0
     for i in range(epochs):
       print(f'Epoch {i}')
-      iteration = 0
       for batch in train_dataloader:
         print(f'iteration {iteration}')
         
         # convert to float32 because model is defined this way
-        source_features = batch[0][-1].to(dtype=torch.float32).transpose(1, 2)
-        target_features = batch[1][-1].to(dtype=torch.float32).transpose(1, 2)
-        source_features = source_features.to(device)
-        target_features = target_features.to(device)
+        source_features = batch[0]
+        target_features = batch[1]
+        x = source_features[-1].to(dtype=torch.float32).transpose(1, 2)
+        y = target_features[-1].to(dtype=torch.float32).transpose(1, 2)
+        x = x.to(device)
+        y = y.to(device)
 
         loss = training_iteration(
-                            x=source_features,
-                            y=target_features,
+                            x=x,
+                            y=y,
                             real_labels=real_labels,
                             fake_labels=fake_labels,
                             optimizer=optimizer,
@@ -138,12 +201,52 @@ def train_cyclegan():
                             Dy=cycleGAN.Dy)
 
         iteration += 1
+
+        if iteration % log_every == 1:
+          it = iter(eval_dataloader)
+          for i in range(10):
+            source_features, target_features = next(it)
+
+            cycleGAN.eval()
+            # Source to target
+            source_mcep = source_features[6].to(dtype=torch.float32).transpose(1, 2)
+            source_mcep = source_mcep.to(device)
+            gxy_mcep = cycleGAN.Gx_y(source_mcep)
+
+            # Target to source
+            target_mcep = target_features[6].to(dtype=torch.float32).transpose(1, 2)
+            target_mcep = target_mcep.to(device)
+            gyx_mcep = cycleGAN.Gy_x(target_mcep)
+            cycleGAN.train()
+
+            log_output_for_eval(source_features, target_features, gxy_mcep, gyx_mcep, eval_dir)
+
         if iteration % stat_every == 0:
-          print(f'loss: {loss.item()}')
+          t_batch = next(iter(test_dataloader))
+          source_features = t_batch[0][-1].to(dtype=torch.float32).transpose(1, 2)
+          target_features = t_batch[1][-1].to(dtype=torch.float32).transpose(1, 2)
+          source_features = source_features.to(device)
+          target_features = target_features.to(device)
+          cycleGAN.eval()
+          test_loss = training_iteration(
+                            x=source_features,
+                            y=target_features,
+                            real_labels=real_labels,
+                            fake_labels=fake_labels,
+                            optimizer=optimizer,
+                            criterion=criterion,
+                            Gx_y=cycleGAN.Gx_y,
+                            Gy_x=cycleGAN.Gy_x,
+                            Dx=cycleGAN.Dx,
+                            Dy=cycleGAN.Dy)
+          cycleGAN.train()
+
 
           elapsed = time.time() - start
           start = time.time()
           print(f'Iterations per second: {stat_every / elapsed}')
+          print(f'loss: {loss.item()}')
+          print(f'Test loss: {test_loss.item()}')
         if iteration % checkpoint_every == 0:
           save_ckpt(cycleGAN)
 

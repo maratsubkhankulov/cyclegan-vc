@@ -39,10 +39,12 @@ This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
 - [x] Extract model from notebook and add a test
 - [x] Extract train.py from notebook
 - [x] Add checkpointing
-- [] Enable GPU training
-- [] Add test/validation dataset and graph how that varies with training loss
-- [] Add learning rate modulation after n epochs
-- [] If loss doesn't improve, debug
-
-
-TODOS:
+- [x] Enable GPU training
+- [x] Add test/validation dataset and graph how that varies with training loss
+- [x] Eval program to generate side-by-side samples given a training module.
+  - [x] Added feature id, full wav to dataset items
+  - [x] Added synthesize_mcep() and save_output_for_eval()
+  - [x] Implement parallel eval generation by using parallel eval dataset
+- [] normalize f0 etc. to match target
+- [] Use two optimizers - for generators and discriminators
+- [] Add learning rate modulation after n iterations
