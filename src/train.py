@@ -58,7 +58,6 @@ def log_output_for_eval(source_features, target_features, xy_mcep, yx_mcep, path
   sf.write(path + '/' + source_name + '_source.wav', source_wav, fs)
   sf.write(path + '/' + target_name + '_target.wav', target_wav, fs)
   
-  # Save Gx_y output
   def synthesize_and_save(features, name, path, mcep):
     f0 = features[0][0].numpy()
     sp = features[2][0].numpy()
@@ -75,10 +74,13 @@ def log_output_for_eval(source_features, target_features, xy_mcep, yx_mcep, path
       mcep = mcep[:f0.shape[0], :]
 
     wav = synthesize_mcep(f0, sp, ap, mcep, fs, frame_period)
-    sf.write(path + '/' + name + '_fake.wav', wav, fs)
+    sf.write(path + '/' + name + '.wav', wav, fs)
   
-  synthesize_and_save(source_features, target_name, path, xy_mcep)
-  synthesize_and_save(target_features, source_name, path, yx_mcep)
+  synthesize_and_save(source_features, source_name + '_to_' + target_name, path, xy_mcep)
+  synthesize_and_save(source_features, source_name + '_orig', path, source_features[6].transpose(1, 2))
+
+  synthesize_and_save(target_features, target_name + '_to_' + source_name, path, yx_mcep)
+  synthesize_and_save(target_features, target_name + '_orig', path, target_features[6].transpose(1, 2))
 
 def train_cyclegan():
   # Loss parameters
