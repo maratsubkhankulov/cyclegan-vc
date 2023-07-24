@@ -11,18 +11,19 @@ from torch.utils.data import DataLoader, random_split
 from model import CycleGAN
 from datetime import datetime
 
-eval_dir = './eval'
+EVAL_DIR = './eval'
+CKPY_DIR = './checkpoints'
 
 def save_ckpt(cycleGAN):
   current_time = datetime.now()
   timestamp = current_time.strftime('%b%d_%H-%M-%S')
-  path = "./checkpoints/" + timestamp + ".pt"
+  path = CKPY_DIR + timestamp + ".pt"
 
   # Save state dict of cycleGAN
   torch.save(cycleGAN.state_dict(), path)
 
 def load_ckpt():
-  files = glob.glob(os.path.join('./checkpoints/', '*.pt'))
+  files = glob.glob(os.path.join(CKPY_DIR, '*.pt'))
   
   files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
   latest_ckpt = files[0]
@@ -91,15 +92,19 @@ def train_cyclegan():
                         y,
                         real_labels,
                         fake_labels,
-                        optimizer,
-                        criterion, Gx_y, Gy_x, Dx, Dy):
+                        optimizer_d,
+                        optimizer_g,
+                        criterion,
+                        Gx_y,
+                        Gy_x,
+                        Dx,
+                        Dy):
 
     # ======================================================== #
-    #                      TRAIN DISCRIMINATORS                #
+    #                      DISCRIMINATOR LOSS                  #
     # ======================================================== #
 
     def adversarial_loss(G, D, source, target):
-
       # Discriminator should learn to classify real and fake features
       # correctly. Thus we give it a set for real features with real labels
       # and a set of fake features with fake labels.
@@ -120,29 +125,40 @@ def train_cyclegan():
 
     dy_loss, real_score, fake_score = adversarial_loss(G=Gx_y, D=Dy, source=x, target=y)
     dx_loss, real_score, fake_score = adversarial_loss(G=Gy_x, D=Dx, source=y, target=x)
-
+    d_loss = dx_loss + dy_loss
 
     # ======================================================== #
-    #                      TRAIN GENERATORS                    #
+    #                      GENERATOR LOSS                      #
     # ======================================================== #
 
     def cycle_consistency_loss(Gx_y, Gy_x, x, y):
-      forward_loss = torch.norm(Gy_x.forward(Gx_y.forward(x)) - x)
-      inverse_forward_loss = torch.norm(Gx_y.forward(Gy_x.forward(y)) - y)
-      return (forward_loss + inverse_forward_loss)
+      forward_loss = torch.norm(Gy_x(Gx_y(x)) - x)
+      inverse_forward_loss = torch.norm(Gx_y(Gy_x(y)) - y)
+      return forward_loss + inverse_forward_loss
     
     def identity_loss(Gx_y, Gy_x, x, y):
-      return torch.norm(Gx_y.forward(y) - y) + torch.norm(Gy_x.forward(x) - x)
+      return torch.norm(Gx_y(y) - y) + torch.norm(Gy_x.forward(x) - x)
     
-    
-    # Train Gx_y and Gy_x
-    full_loss = dx_loss + dy_loss + cycle_consistency_loss(Gx_y, Gy_x, x, y) * cyc_tradeoff_parameter + \
+    g_loss = cycle_consistency_loss(Gx_y, Gy_x, x, y) * cyc_tradeoff_parameter + \
       identity_loss(Gx_y, Gy_x, x, y) * identity_tradeoff_parameter
 
-    optimizer.zero_grad()
-    optimizer.zero_grad()
-    full_loss.backward()
-    optimizer.step()
+    full_loss = d_loss + g_loss
+
+    # ======================================================== #
+    #                     TRAIN GENERATOR                      #
+    # ======================================================== #
+    optimizer_g.zero_grad()
+    optimizer_g.zero_grad()
+    g_loss.backward()
+    optimizer_g.step()
+
+    # ======================================================== #
+    #                     TRAIN DISCRIMINATOR                  #
+    # ======================================================== #
+    optimizer_d.zero_grad()
+    optimizer_d.zero_grad()
+    d_loss.backward()
+    optimizer_d.step()
 
     # Return all losses
     return full_loss
@@ -150,16 +166,18 @@ def train_cyclegan():
   device = 'cuda:0'
 
   batch_size=1
-  cycleGAN = load_ckpt()
+  # cycleGAN = load_ckpt()
+  cycleGAN = CycleGAN()
   cycleGAN = cycleGAN.to(device)
 
   # Create labels which are later used as input for the BCU loss
   real_labels = torch.ones(batch_size, 1, device=device)
   fake_labels = torch.zeros(batch_size, 1, device=device)
 
-  optimizer=torch.optim.Adam(cycleGAN.parameters(), lr=0.0002)
-  criterion=torch.nn.BCELoss()
+  optimizer_d = torch.optim.Adam(list(cycleGAN.Dx.parameters()) + list(cycleGAN.Dy.parameters()), lr=0.0001)
+  optimizer_g = torch.optim.Adam(list(cycleGAN.Gx_y.parameters()) + list(cycleGAN.Gy_x.parameters()), lr=0.0002)
 
+  criterion = torch.nn.BCELoss()
   
   eval_dataset = WorldDataset('./data/vcc2016_training', batch_size=1, train=False, sr=16000)
   eval_dataloader = DataLoader(eval_dataset, batch_size=1, shuffle=False, num_workers=1)
@@ -172,7 +190,7 @@ def train_cyclegan():
 
   checkpoint_every = 500
   stat_every = 100
-  log_every = 162
+  log_every = 162*3
 
   def train(epochs):
     start = time.time()
@@ -195,7 +213,8 @@ def train_cyclegan():
                             y=y,
                             real_labels=real_labels,
                             fake_labels=fake_labels,
-                            optimizer=optimizer,
+                            optimizer_d=optimizer_d,
+                            optimizer_g=optimizer_g,
                             criterion=criterion,
                             Gx_y=cycleGAN.Gx_y,
                             Gy_x=cycleGAN.Gy_x,
@@ -221,7 +240,7 @@ def train_cyclegan():
             gyx_mcep = cycleGAN.Gy_x(target_mcep)
             cycleGAN.train()
 
-            log_output_for_eval(source_features, target_features, gxy_mcep, gyx_mcep, eval_dir)
+            log_output_for_eval(source_features, target_features, gxy_mcep, gyx_mcep, EVAL_DIR)
 
         if iteration % stat_every == 0:
           t_batch = next(iter(test_dataloader))
@@ -235,7 +254,8 @@ def train_cyclegan():
                             y=target_features,
                             real_labels=real_labels,
                             fake_labels=fake_labels,
-                            optimizer=optimizer,
+                            optimizer_d=optimizer_g,
+                            optimizer_g=optimizer_g,
                             criterion=criterion,
                             Gx_y=cycleGAN.Gx_y,
                             Gy_x=cycleGAN.Gy_x,
