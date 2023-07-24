@@ -46,8 +46,9 @@ This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
   - [x] Added synthesize_mcep() and save_output_for_eval()
   - [x] Implement parallel eval generation by using parallel eval dataset
 - [x] Use two optimizers - for generators and discriminators
-- [] Swap BCE loss for least squares loss
-- [] Stop using identity loss after 20k iterations
-- [] Decay learning rate for 20k iterations after the first 20k iterations
+- [] Update loss function
+  - [] Swap BCE loss for least squares loss
+  - [] Stop using identity loss after 20k iterations
+  - [] Decay learning rate for 20k iterations after the first 20k iterations
+- [] complain to Konstantinos
 - [] normalize f0 etc. to match target
-- [] Add learning rate modulation after n iterations
