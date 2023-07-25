@@ -278,7 +278,7 @@ def train_cyclegan(
           print(f'loss: {loss.item()}')
           print(f'Test loss: {test_loss.item()}')
         if iteration % checkpoint_every == 0:
-          save_ckpt(cycleGAN)
+          save_ckpt(cycleGAN, checkpoint_dir)
 
   train(epochs = 100)
 
