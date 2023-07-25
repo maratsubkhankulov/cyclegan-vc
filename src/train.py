@@ -1,3 +1,4 @@
+import argparse
 import time
 import torch
 import numpy as np
@@ -11,27 +12,25 @@ from torch.utils.data import DataLoader, random_split
 from model import CycleGAN
 from datetime import datetime
 
-EVAL_DIR = './eval'
-CKPY_DIR = './checkpoints'
 
-def save_ckpt(cycleGAN):
+def save_ckpt(cycleGAN, ckpt_dir):
   current_time = datetime.now()
   timestamp = current_time.strftime('%b%d_%H-%M-%S')
-  path = CKPY_DIR + timestamp + ".pt"
+  path = ckpt_dir + timestamp + ".pt"
 
   # Save state dict of cycleGAN
   torch.save(cycleGAN.state_dict(), path)
 
-def load_ckpt():
-  files = glob.glob(os.path.join(CKPY_DIR, '*.pt'))
+def load_ckpt(cycleGAN, ckpt_dir):
+  files = glob.glob(os.path.join(ckpt_dir, '*.pt'))
   
   files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-  latest_ckpt = files[0]
-  cycleGAN_loaded = CycleGAN()
-  cycleGAN_loaded.load_state_dict(torch.load(latest_ckpt))
-  cycleGAN_loaded.eval()
+  if len(files) == 0:
+    raise Exception('No checkpoint found')
 
-  return cycleGAN_loaded
+  latest_ckpt = files[0]
+  cycleGAN.load_state_dict(torch.load(latest_ckpt))
+  cycleGAN.eval()
 
 def synthesize_mcep(f0, sp, ap, mcep, fs, frame_period):
   sp = pw.decode_spectral_envelope(mcep.numpy(), fs, fft_size=1024)
@@ -83,7 +82,15 @@ def log_output_for_eval(source_features, target_features, xy_mcep, yx_mcep, path
   synthesize_and_save(target_features, target_name + '_to_' + source_name, path, yx_mcep)
   synthesize_and_save(target_features, target_name + '_orig', path, target_features[6].transpose(1, 2))
 
-def train_cyclegan():
+def train_cyclegan(
+  source_speaker,
+  target_speaker,
+  train_data_dir,
+  eval_data_dir,
+  checkpoint_dir,
+  resume_from_checkpoint,
+  eval_output_dir,
+):
   # Loss parameters
   cyc_tradeoff_parameter=10
   identity_tradeoff_parameter=5
@@ -166,8 +173,9 @@ def train_cyclegan():
   device = 'cuda:0'
 
   batch_size=1
-  # cycleGAN = load_ckpt()
   cycleGAN = CycleGAN()
+  if resume_from_checkpoint:
+    load_ckpt(cycleGAN, checkpoint_dir)
   cycleGAN = cycleGAN.to(device)
 
   # Create labels which are later used as input for the BCU loss
@@ -179,10 +187,10 @@ def train_cyclegan():
 
   criterion = torch.nn.BCELoss()
   
-  eval_dataset = WorldDataset('./data/vcc2016_training', batch_size=1, train=False, sr=16000)
+  eval_dataset = WorldDataset(source_speaker, target_speaker, eval_data_dir, batch_size=1, train=False, sr=16000)
   eval_dataloader = DataLoader(eval_dataset, batch_size=1, shuffle=False, num_workers=1)
 
-  dataset = WorldDataset('./data/vcc2016_training', batch_size=1, train=True, sr=16000)
+  dataset = WorldDataset(source_speaker, target_speaker, train_data_dir, batch_size=1, train=True, sr=16000)
   train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
   
   train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=1)
@@ -240,7 +248,7 @@ def train_cyclegan():
             gyx_mcep = cycleGAN.Gy_x(target_mcep)
             cycleGAN.train()
 
-            log_output_for_eval(source_features, target_features, gxy_mcep, gyx_mcep, EVAL_DIR)
+            log_output_for_eval(source_features, target_features, gxy_mcep, gyx_mcep, eval_output_dir)
 
         if iteration % stat_every == 0:
           t_batch = next(iter(test_dataloader))
@@ -275,4 +283,23 @@ def train_cyclegan():
   train(epochs = 100)
 
 if __name__ == '__main__':
-  train_cyclegan()
+  args_parser = argparse.ArgumentParser()
+  args_parser.add_argument('--source_speaker', default='SF1', help='Source speaker ID')
+  args_parser.add_argument('--target_speaker', default='TF2', help='Target speaker ID')
+  args_parser.add_argument('--train_data_dir', default='./data/vcc2016_training/', help='Path to training data')
+  args_parser.add_argument('--eval_data_dir', default='./data/evaluation_all/', help='Path to evaluation data')
+  args_parser.add_argument('--checkpoint_dir', default='checkpoints', help='Path to checkpoint directory')
+  args_parser.add_argument('--resume_from_checkpoint', default=False, help='Resume training from latest checkpoint')
+  args_parser.add_argument('--eval_output_dir', default='eval_output', help='Path to evaluation output directory')
+
+  args = args_parser.parse_args()
+
+  train_cyclegan(
+    source_speaker=args.source_speaker,
+    target_speaker=args.target_speaker,
+    train_data_dir=args.train_data_dir,
+    eval_data_dir=args.eval_data_dir,
+    checkpoint_dir=args.checkpoint_dir,
+    resume_from_checkpoint=args.resume_from_checkpoint,
+    eval_output_dir=args.eval_output_dir,
+  )

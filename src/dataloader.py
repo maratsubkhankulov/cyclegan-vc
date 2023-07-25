@@ -27,7 +27,9 @@ class WorldDataset(torch.utils.data.Dataset):
   using World vocoder.
   """
     
-  def __init__(self, path, batch_size=1, sr=16_000, train=True, device='cpu:0'):
+  def __init__(self, source_speaker, target_speaker, path, batch_size=1, sr=16_000, train=True, device='cpu:0'):
+    self.source_speaker = source_speaker
+    self.target_speaker = target_speaker
     self.path = path
     self.batch_size = batch_size
     self.sr = sr
@@ -36,18 +38,15 @@ class WorldDataset(torch.utils.data.Dataset):
     self.n_frames = 128
     self.speaker_ids = [] # speaker 
     self.speaker_file_dict = defaultdict(list) # speaker -> [file1, file2, ...]
-    self.sources = ['SF1'] #, 'SF2']
-    self.targets = ['TF2'] #, 'TM2']
     self.feature_cache = {}
     self.load_files()
 
   def load_files(self):
-    # offset into self.files
     for speaker in os.listdir(self.path):
       speaker_path = os.path.join(self.path, speaker)
       self.speaker_ids.append(speaker)
       if os.path.isdir(speaker_path):
-        for file in os.listdir(speaker_path):
+        for file in sorted(os.listdir(speaker_path)):
           file_path = os.path.join(speaker_path, file)
           if os.path.isfile(file_path):
             self.speaker_file_dict[speaker].append(file_path)
@@ -100,8 +99,8 @@ class WorldDataset(torch.utils.data.Dataset):
     return len(self.speaker_file_dict['SF1']) // self.batch_size
   
   def __getitem__(self, idx):
-    source = self.speaker_file_dict['SF1'][idx]
-    target = self.speaker_file_dict['TF2'][idx]
+    source = self.speaker_file_dict[self.source_speaker][idx]
+    target = self.speaker_file_dict[self.target_speaker][idx]
 
     source_features = self.extract_features_memoized(source)
     target_features = self.extract_features_memoized(target)

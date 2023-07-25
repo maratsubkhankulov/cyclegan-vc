@@ -46,6 +46,7 @@ This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
   - [x] Added synthesize_mcep() and save_output_for_eval()
   - [x] Implement parallel eval generation by using parallel eval dataset
 - [x] Use two optimizers - for generators and discriminators
+- [] Produce eval samples for SF1->TF2, SF1->TM3, SM1->TF2, SM1->TM3
 - [] Update loss function
   - [] Swap BCE loss for least squares loss
   - [] Stop using identity loss after 20k iterations
