@@ -2,6 +2,12 @@
 
 This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
 
+# f0 stats
+SF1 log f0 mean: 5.388794225257816
+SF1 log f0 std: 0.2398814107162179
+TM3 log f0 mean: 4.858265991213904
+TM3 log f0 std: 0.23171982666578547
+
 # TODO:
 - [x] Just try to implement the architecture of CycleGAN Generator and Discriminator
 - [x] Write model with Gx->y, Gy->x and Dy submodules
@@ -47,9 +53,9 @@ This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
   - [x] Implement parallel eval generation by using parallel eval dataset
 - [x] Use two optimizers - for generators and discriminators
 - [x] Produce eval samples for SF1->TF2, SF1->TM3, SM1->TF2, SM1->TM3
+- [x] Convert F0 using logarithm Gaussian normalized transformation
 - [] Update loss function
+  - [] Decay learning rate for 20k iterations after the first 20k iterations
   - [] Swap BCE loss for least squares loss
   - [] Stop using identity loss after 20k iterations
-  - [] Decay learning rate for 20k iterations after the first 20k iterations
 - [] complain to Konstantinos
-- [] normalize f0 etc. to match target
