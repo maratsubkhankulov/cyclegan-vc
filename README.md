@@ -8,9 +8,24 @@ I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) 
 
 ## Installation
 
+1. Download training data
+2. Install code dependencies
+3. Generate f0 stats
+4. Run training
+
 ## Usage
 
-## f0 stats
+If all goes well, you should see something like this
+```
+python3 src/train.py --resume_from_checkpoint False --checkpoint_dir SF1_TM3_checkpoints --source_speaker SF1 --target_speaker TM3 --source_logf0_mean 5.38879422525781 --source_logf0_std 0.2398814107162179 --target_logf0_mean  4.858265991213904 --target_logf0_std 0.23171982666578547
+Epoch 0
+Iteration: 10, it/s: 0.49, d_loss: 0.0083846, g_loss: 613.42, test_d_loss: 0.0028683, test_g_loss: 515.88
+Iteration: 20, it/s: 0.75, d_loss: 0.0016719, g_loss: 602.03, test_d_loss: 0.0137144, test_g_loss: 644.71
+Iteration: 30, it/s: 0.69, d_loss: 0.0010094, g_loss: 620.05, test_d_loss: 0.0019095, test_g_loss: 566.79
+...
+```
+
+### f0 stats
 
 ```
 SF1 log f0 mean: 5.388794225257816
