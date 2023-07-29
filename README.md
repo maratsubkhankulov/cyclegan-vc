@@ -1,6 +1,7 @@
 # CycleGAN VC
 
 This code reproduces the CycleGAN-VC paper: [PARALLEL-DATA-FREE VOICE CONVERSION USING CYCLE-CONSISTENT ADVERSARIAL NETWORKS, T. Kaneko, H. Kameoka 2017](https://arxiv.org/pdf/1711.11293.pdf)
+
 I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) as a reference when stuck for ideas about how to interpret the paper.
 
 # Generated samples
@@ -10,10 +11,13 @@ I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) 
 # Usage
 
 # f0 stats
+
+```
 SF1 log f0 mean: 5.388794225257816
 SF1 log f0 std: 0.2398814107162179
 TM3 log f0 mean: 4.858265991213904
 TM3 log f0 std: 0.23171982666578547
+```
 
 # TODO:
 - [x] Just try to implement the architecture of CycleGAN Generator and Discriminator
