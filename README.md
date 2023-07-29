@@ -4,13 +4,13 @@ This code reproduces the CycleGAN-VC paper: [PARALLEL-DATA-FREE VOICE CONVERSION
 
 I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) as a reference when stuck for ideas about how to interpret the paper.
 
-# Generated samples
+## Generated samples
 
-# Installation
+## Installation
 
-# Usage
+## Usage
 
-# f0 stats
+## f0 stats
 
 ```
 SF1 log f0 mean: 5.388794225257816
@@ -19,7 +19,7 @@ TM3 log f0 mean: 4.858265991213904
 TM3 log f0 std: 0.23171982666578547
 ```
 
-# TODO:
+## TODO:
 - [x] Just try to implement the architecture of CycleGAN Generator and Discriminator
 - [x] Write model with Gx->y, Gy->x and Dy submodules
 - [x] Reproduce inverse-forward and forward-inverse passes
