@@ -1,6 +1,13 @@
 # CycleGAN VC
 
-This repository reproduces https://arxiv.org/pdf/1711.11293.pdf.
+This code reproduces the CycleGAN-VC paper: [PARALLEL-DATA-FREE VOICE CONVERSION USING CYCLE-CONSISTENT ADVERSARIAL NETWORKS, T. Kaneko, H. Kameoka 2017](https://arxiv.org/pdf/1711.11293.pdf)
+I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) as a reference when stuck for ideas about how to interpret the paper.
+
+# Generated samples
+
+# Installation
+
+# Usage
 
 # f0 stats
 SF1 log f0 mean: 5.388794225257816
@@ -58,4 +65,7 @@ TM3 log f0 std: 0.23171982666578547
   - [x] Decay learning rate for 20k iterations after the first 20k iterations
   - [] Swap BCE loss for least squares loss
   - [x] Stop using identity loss after 1k iterations
+- [] Cleanup
+  - [] Add output samples to README
+  - [] Add diagram
 - [] complain to Konstantinos
