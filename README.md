@@ -55,7 +55,7 @@ TM3 log f0 std: 0.23171982666578547
 - [x] Produce eval samples for SF1->TF2, SF1->TM3, SM1->TF2, SM1->TM3
 - [x] Convert F0 using logarithm Gaussian normalized transformation
 - [] Update loss function
-  - [] Decay learning rate for 20k iterations after the first 20k iterations
+  - [x] Decay learning rate for 20k iterations after the first 20k iterations
   - [] Swap BCE loss for least squares loss
-  - [] Stop using identity loss after 20k iterations
+  - [x] Stop using identity loss after 1k iterations
 - [] complain to Konstantinos

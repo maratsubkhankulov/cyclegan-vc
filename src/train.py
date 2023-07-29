@@ -8,6 +8,7 @@ import pyworld as pw
 import soundfile as sf
 
 from dataloader import WorldDataset
+from preprocess import pitch_conversion
 from torch.utils.data import DataLoader, random_split
 from model import CycleGAN
 from datetime import datetime
@@ -16,7 +17,9 @@ from datetime import datetime
 def save_ckpt(cycleGAN, ckpt_dir):
   current_time = datetime.now()
   timestamp = current_time.strftime('%b%d_%H-%M-%S')
-  path = ckpt_dir + timestamp + ".pt"
+  path = ckpt_dir + '/' + timestamp + ".pt"
+
+  print(f'Saving checkpoint to {path}')
 
   # Save state dict of cycleGAN
   torch.save(cycleGAN.state_dict(), path)
@@ -59,7 +62,7 @@ def log_output_for_eval(source_features, target_features, xy_mcep, yx_mcep, path
   sf.write(path + '/' + target_name + '_target.wav', target_wav, fs)
   
   def synthesize_and_save(features, name, path, mcep):
-    f0 = features[0][0].numpy()
+    f0 = features[0].flatten().numpy()
     sp = features[2][0].numpy()
     ap = features[3][0].numpy()
 
@@ -90,10 +93,22 @@ def train_cyclegan(
   checkpoint_dir,
   resume_from_checkpoint,
   eval_output_dir,
+  source_logf0_mean,
+  source_logf0_std,
+  target_logf0_mean,
+  target_logf0_std,
 ):
-  # Loss parameters
+  # Hyperparameters
   cyc_tradeoff_parameter=10
   identity_tradeoff_parameter=5
+
+  max_iterations = 2*pow(10, 5)
+  decay_learning_rate_after = 2*pow(10,5)
+  linearly_decay_for = 2*pow(10,5)
+  generate_n_validation_samples = 3
+  checkpoint_every = max_iterations/10
+  stat_every = 10
+  generate_validation_samples_every = max_iterations/100
 
   def training_iteration(x,
                         y,
@@ -105,7 +120,8 @@ def train_cyclegan(
                         Gx_y,
                         Gy_x,
                         Dx,
-                        Dy):
+                        Dy,
+                        iteration):
 
     # ======================================================== #
     #                      DISCRIMINATOR LOSS                  #
@@ -146,8 +162,11 @@ def train_cyclegan(
     def identity_loss(Gx_y, Gy_x, x, y):
       return torch.norm(Gx_y(y) - y) + torch.norm(Gy_x.forward(x) - x)
     
-    g_loss = cycle_consistency_loss(Gx_y, Gy_x, x, y) * cyc_tradeoff_parameter + \
-      identity_loss(Gx_y, Gy_x, x, y) * identity_tradeoff_parameter
+    g_loss = cycle_consistency_loss(Gx_y, Gy_x, x, y) * cyc_tradeoff_parameter
+
+    # From paper: "We used [identity loss] only for the first pow(10, 4) iterations."
+    if iteration < pow(10, 4):
+      g_loss += identity_loss(Gx_y, Gy_x, x, y) * identity_tradeoff_parameter
 
     full_loss = d_loss + g_loss
 
@@ -168,7 +187,7 @@ def train_cyclegan(
     optimizer_d.step()
 
     # Return all losses
-    return full_loss
+    return d_loss, g_loss
 
   device = 'cuda:0'
 
@@ -182,8 +201,19 @@ def train_cyclegan(
   real_labels = torch.ones(batch_size, 1, device=device)
   fake_labels = torch.zeros(batch_size, 1, device=device)
 
-  optimizer_d = torch.optim.Adam(list(cycleGAN.Dx.parameters()) + list(cycleGAN.Dy.parameters()), lr=0.0001)
-  optimizer_g = torch.optim.Adam(list(cycleGAN.Gx_y.parameters()) + list(cycleGAN.Gy_x.parameters()), lr=0.0002)
+  optimizer_d = torch.optim.Adam(
+    list(cycleGAN.Dx.parameters()) + list(cycleGAN.Dy.parameters()),
+    lr=0.0001,
+    betas=(0.5, 0.999)
+  )
+  optimizer_g = torch.optim.Adam(
+    list(cycleGAN.Gx_y.parameters()) + list(cycleGAN.Gy_x.parameters()),
+    lr=0.0002,
+    betas=(0.5, 0.999)
+  )
+
+  d_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer_d, start_factor=1.0, end_factor=0.0, total_iters=linearly_decay_for)
+  g_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer_g, start_factor=1.0, end_factor=0.0, total_iters=linearly_decay_for)
 
   criterion = torch.nn.BCELoss()
   
@@ -196,17 +226,15 @@ def train_cyclegan(
   train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=1)
   test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_workers=1)
 
-  checkpoint_every = 500
-  stat_every = 100
-  log_every = 162*3
-
-  def train(epochs):
+  def train():
     start = time.time()
     iteration = 0
-    for i in range(epochs):
-      print(f'Epoch {i}')
+    epoch = 0
+    while iteration < max_iterations:
+      print(f'Epoch {epoch}')
       for batch in train_dataloader:
-        print(f'iteration {iteration}')
+        if iteration >= max_iterations:
+          break
         
         # convert to float32 because model is defined this way
         source_features = batch[0]
@@ -216,7 +244,7 @@ def train_cyclegan(
         x = x.to(device)
         y = y.to(device)
 
-        loss = training_iteration(
+        d_loss, g_loss = training_iteration(
                             x=x,
                             y=y,
                             real_labels=real_labels,
@@ -227,14 +255,19 @@ def train_cyclegan(
                             Gx_y=cycleGAN.Gx_y,
                             Gy_x=cycleGAN.Gy_x,
                             Dx=cycleGAN.Dx,
-                            Dy=cycleGAN.Dy)
+                            Dy=cycleGAN.Dy,
+                            iteration=iteration)
 
         iteration += 1
 
-        if iteration % log_every == 1:
+        if iteration % generate_validation_samples_every == 0:
           it = iter(eval_dataloader)
-          for i in range(10):
+          print(f'Logging evaluation data. Iteration {iteration}')
+          for i in range(generate_n_validation_samples):
             source_features, target_features = next(it)
+
+            source_features[0] = pitch_conversion(source_features[0][0], source_logf0_mean, source_logf0_std, target_logf0_mean, target_logf0_std)
+            target_features[0] = pitch_conversion(target_features[0][0], target_logf0_mean, target_logf0_std, source_logf0_mean, source_logf0_std)
 
             cycleGAN.eval()
             # Source to target
@@ -257,7 +290,7 @@ def train_cyclegan(
           source_features = source_features.to(device)
           target_features = target_features.to(device)
           cycleGAN.eval()
-          test_loss = training_iteration(
+          test_d_loss, test_g_loss = training_iteration(
                             x=source_features,
                             y=target_features,
                             real_labels=real_labels,
@@ -268,19 +301,24 @@ def train_cyclegan(
                             Gx_y=cycleGAN.Gx_y,
                             Gy_x=cycleGAN.Gy_x,
                             Dx=cycleGAN.Dx,
-                            Dy=cycleGAN.Dy)
+                            Dy=cycleGAN.Dy,
+                            iteration=iteration)
           cycleGAN.train()
 
 
           elapsed = time.time() - start
           start = time.time()
-          print(f'Iterations per second: {stat_every / elapsed}')
-          print(f'loss: {loss.item()}')
-          print(f'Test loss: {test_loss.item()}')
+          print(f'Iteration: {iteration}, it/s: {(stat_every / elapsed):.2f}, d_loss: {d_loss.item():.7f}, g_loss: {g_loss.item():.2f}, test_d_loss: {test_d_loss.item():.7f}, test_g_loss: {test_g_loss.item():.2f}')
+
         if iteration % checkpoint_every == 0:
           save_ckpt(cycleGAN, checkpoint_dir)
+        if iteration > decay_learning_rate_after:
+          d_scheduler.step()
+          g_scheduler.step()
+          print(f'Adjusted learning rate for generators {g_scheduler.get_last_lr()} and discriminators {d_scheduler.get_last_lr()}')
+      epoch += 1
 
-  train(epochs = 100)
+  train()
 
 if __name__ == '__main__':
   args_parser = argparse.ArgumentParser()
@@ -291,6 +329,10 @@ if __name__ == '__main__':
   args_parser.add_argument('--checkpoint_dir', default='checkpoints', help='Path to checkpoint directory')
   args_parser.add_argument('--resume_from_checkpoint', default=False, help='Resume training from latest checkpoint')
   args_parser.add_argument('--eval_output_dir', default='eval_output', help='Path to evaluation output directory')
+  args_parser.add_argument('--source_logf0_mean', default=5.0, type=float, help='Source log f0 mean')
+  args_parser.add_argument('--source_logf0_std', default=1.0, type=float, help='Source log f0 std')
+  args_parser.add_argument('--target_logf0_mean', default=5.0, type=float, help='Target log f0 mean')
+  args_parser.add_argument('--target_logf0_std', default=1.0, type=float, help='Target log f0 std')
 
   args = args_parser.parse_args()
 
@@ -302,4 +344,8 @@ if __name__ == '__main__':
     checkpoint_dir=args.checkpoint_dir,
     resume_from_checkpoint=args.resume_from_checkpoint,
     eval_output_dir=args.eval_output_dir,
+    source_logf0_mean=args.source_logf0_mean,
+    source_logf0_std=args.source_logf0_std,
+    target_logf0_mean=args.target_logf0_mean,
+    target_logf0_std=args.target_logf0_std,
   )
