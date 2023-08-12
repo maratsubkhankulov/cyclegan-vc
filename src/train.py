@@ -155,12 +155,12 @@ def train_cyclegan(
     # ======================================================== #
 
     def cycle_consistency_loss(Gx_y, Gy_x, x, y):
-      forward_loss = torch.norm(Gy_x(Gx_y(x)) - x)
-      inverse_forward_loss = torch.norm(Gx_y(Gy_x(y)) - y)
+      forward_loss = torch.linalg.matrix_norm(Gy_x(Gx_y(x)) - x, ord=1)
+      inverse_forward_loss = torch.linalg.matrix_norm(Gx_y(Gy_x(y)) - y, ord=1)
       return forward_loss + inverse_forward_loss
     
     def identity_loss(Gx_y, Gy_x, x, y):
-      return torch.norm(Gx_y(y) - y) + torch.norm(Gy_x.forward(x) - x)
+      return torch.linalg.matrix_norm(Gx_y(y) - y, ord=1) + torch.linalg.matrix_norm(Gy_x.forward(x) - x, ord=1)
     
     g_loss = cycle_consistency_loss(Gx_y, Gy_x, x, y) * cyc_tradeoff_parameter
 
@@ -193,6 +193,7 @@ def train_cyclegan(
 
   batch_size=1
   cycleGAN = CycleGAN()
+  import pdb; pdb.set_trace()
   if resume_from_checkpoint:
     load_ckpt(cycleGAN, checkpoint_dir)
   cycleGAN = cycleGAN.to(device)
@@ -327,7 +328,7 @@ if __name__ == '__main__':
   args_parser.add_argument('--train_data_dir', default='./data/vcc2016_training/', help='Path to training data')
   args_parser.add_argument('--eval_data_dir', default='./data/evaluation_all/', help='Path to evaluation data')
   args_parser.add_argument('--checkpoint_dir', default='checkpoints', help='Path to checkpoint directory')
-  args_parser.add_argument('--resume_from_checkpoint', default=False, help='Resume training from latest checkpoint')
+  args_parser.add_argument('--resume_from_checkpoint', type=bool, default=False, help='Resume training from latest checkpoint')
   args_parser.add_argument('--eval_output_dir', default='eval_output', help='Path to evaluation output directory')
   args_parser.add_argument('--source_logf0_mean', default=5.0, type=float, help='Source log f0 mean')
   args_parser.add_argument('--source_logf0_std', default=1.0, type=float, help='Source log f0 std')
