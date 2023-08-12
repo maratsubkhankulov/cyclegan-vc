@@ -15,9 +15,9 @@ I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) 
 
 ## Discussion
 
-- log f0 conversion
-- maintaining prosody
-- no parallel data 
+- Log f0 conversion carries a lot of weight in this paper by adjusting the pitch of the speaker.
+- Maintaining prosody - at first I was suprised that prosody of the original speaker was maintained, but this can be desirable for voice conversion because you don't want to erase speaker identity. Preservation of prosody can be explained by the relatively small receptive field of the convolutions.
+- I was impressed that voice conversion can be learned from non-parallel examples.
 
 ## Installation
 
