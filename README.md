@@ -1,7 +1,7 @@
 # CycleGAN VC
 
-![Generator architecture]('./generator.png')
-![Discriminator architecture]('./discriminator.png')
+![Generator arch](https://raw.githubusercontent.com/maratsubkhankulov/cyclegan-vc/8752c9ebab44f0906fb6f9b1132b710961576ffd/generator.png)
+![Discriminator arch](https://raw.githubusercontent.com/maratsubkhankulov/cyclegan-vc/8752c9ebab44f0906fb6f9b1132b710961576ffd/discriminator.png)
 
 This code reproduces the CycleGAN-VC paper: [PARALLEL-DATA-FREE VOICE CONVERSION USING CYCLE-CONSISTENT ADVERSARIAL NETWORKS, T. Kaneko, H. Kameoka 2017](https://arxiv.org/pdf/1711.11293.pdf)
 
