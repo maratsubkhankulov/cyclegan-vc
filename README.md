@@ -9,7 +9,9 @@ I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) 
 
 ## Generated samples
 
-- [Female 1](https://github.com/maratsubkhankulov/cyclegan-vc/raw/main/samples/200001_SF1_source.wav) [Male 1](./samples/200001_TM3_target.wav) [Female 1->Male](./samples/200001_SF1_to_200001_TM3.wav) [Male 1->Female](./samples/200001_TM3_to_200001_SF1.wav)
+<audio controls src="https://github.com/maratsubkhankulov/cyclegan-vc/raw/main/samples/200001_SF1_source.wav">
+
+- ![Female 1](https://github.com/maratsubkhankulov/cyclegan-vc/raw/main/samples/200001_SF1_source.wav) [Male 1](./samples/200001_TM3_target.wav) [Female 1->Male](./samples/200001_SF1_to_200001_TM3.wav) [Male 1->Female](./samples/200001_TM3_to_200001_SF1.wav)
 - [Female 2](./samples/200002_SF1_source.wav) [Male 2](./samples/200002_TM3_target.wav) [Female 2->Male](./samples/200002_SF1_to_200002_TM3.wav) [Male 2->Female](./samples/200002_TM3_to_200002_SF1.wav)
 - [Female 3](./samples/200003_SF1_source.wav) [Male 3](./samples/200003_TM3_target.wav) [Female 3->Male](./samples/200003_SF1_to_200003_TM3.wav) [Male 3->Female](./samples/200003_TM3_to_200003_SF1.wav)
 
