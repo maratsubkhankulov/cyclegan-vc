@@ -15,9 +15,9 @@ I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) 
 
 ## Discussion
 
-- Log f0 conversion carries a lot of weight in this paper by adjusting the pitch of the speaker.
-- Maintaining prosody - at first I was suprised that prosody of the original speaker was maintained, but this can be desirable for voice conversion because you don't want to erase speaker identity. Preservation of prosody can be explained by the relatively small receptive field of the convolutions.
-- I was impressed that voice conversion can be learned from non-parallel examples.
+This was a fun paper to reproduce. I was impressed that voice conversion can be learned from non-parallel examples in this way. I noted that log(f0) conversion carries a lot of weight in the way that the results sound because it shifts the pitch of the speaker, without the synthesized voices sound fairly close to the original input. At first I was disappointed that prosody (rhythm and timing) of the original speaker was maintained, but this can be desirable for voice conversion because you may not want to erase the speaker identity completely - this depends on application. Preservation of prosody can be explained by the relatively small receptive field of the convolutions.
+
+I didn't get to reproducing the evaluation step of the paper and stopped at the point where synthesized examples sound close to the original paper's examples. I'm unlikely to keep tweaking it.
 
 ## Installation
 
