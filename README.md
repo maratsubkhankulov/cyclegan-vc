@@ -9,7 +9,7 @@ I used [this repository](https://github.com/pritishyuvraj/Voice-Conversion-GAN) 
 
 ## Generated samples
 
-Generated samples can be found [here](https://github.com/maratsubkhankulov/cyclegan-vc/raw/main/samples/)
+Generated samples can be found [here](https://docs.google.com/presentation/d/1fJlDwIBgM_ANQZxCtv_c3xnUkahVrS85HfuMIoaFVeg/edit?usp=sharing)
 
 ## Discussion
 
